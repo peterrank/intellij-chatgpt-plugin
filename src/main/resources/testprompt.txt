@@ -1,0 +1,24 @@
+Ich habe folgenden Code für ein IntelliJ-Plugin.
+Der Compiler sagt com.intellij.openapi.components.ServiceManager ist deprecated,
+sowie auch ContentFactory.SERVICE.
+Baue den Code um, so dass er keine deprecated Dinge verwendet.
+
+
+package de.softmanufaktur.chatgpt.chat
+
+import com.intellij.openapi.components.ServiceManager
+import com.intellij.openapi.project.DumbAware
+import com.intellij.openapi.project.Project
+import com.intellij.openapi.wm.ToolWindow
+import com.intellij.openapi.wm.ToolWindowFactory
+import com.intellij.ui.content.ContentFactory
+
+class ChatGptToolWindowFactory : ToolWindowFactory, DumbAware {
+
+    override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
+        val chatGptPanel = ServiceManager.getService(project, ChatGptPanel::class.java)
+        val contentFactory = ContentFactory.SERVICE.getInstance()
+        val content = contentFactory.createContent(chatGptPanel, "", false)
+        toolWindow.contentManager.addContent(content)
+    }
+}

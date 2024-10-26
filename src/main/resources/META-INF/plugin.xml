@@ -1,0 +1,40 @@
+<!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
+<idea-plugin>
+  <!-- Unique identifier of the plugin. It should be FQN. It cannot be changed between the plugin versions. -->
+  <id>de.softmanufaktur.chatgptplugin</id>
+
+  <!-- Public plugin name should be written in Title Case.
+       Guidelines: https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-name -->
+  <name>ChatGPTPlugin</name>
+
+  <!-- A displayed Vendor name or Organization ID displayed on the Plugins Page. -->
+  <vendor email="peter@softmanufaktur.de" url="https://www.softmanufaktur.de">Softmanufaktur</vendor>
+
+  <!-- Description of the plugin displayed on the Plugin Page and IDE Plugin Manager.
+       Simple HTML elements (text formatting, paragraphs, and lists) can be added inside of <![CDATA[ ]]> tag.
+       Guidelines: https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-description -->
+  <description>Plugin für ChatGPT-Aufrufe</description>
+
+  <!-- Product and plugin compatibility requirements.
+       Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
+  <depends>com.intellij.modules.platform</depends>
+
+  <!-- Extension points defined by the plugin.
+       Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
+  <extensions defaultExtensionNs="com.intellij">
+    <applicationService serviceImplementation="de.softmanufaktur.chatgpt.unittestgenerator.settings.UnitTestGeneratorSettings"/>
+    <projectConfigurable instance="de.softmanufaktur.chatgpt.unittestgenerator.settings.SettingsConfigurable" displayName="Unit Test Generator Settings"/>
+    <toolWindow id="ChatGPT" factoryClass="de.softmanufaktur.chatgpt.chat.ChatGptToolWindowFactory" anchor="right"/>
+  </extensions>
+
+
+  <actions>
+    <action id="de.softmanufaktur.chatgpt.unittestgenerator.CreateTestCasesAction"
+      class="de.softmanufaktur.chatgpt.unittestgenerator.CreateTestCasesAction"
+      text="create unittests"
+      description="Creates test cases for the selected class"
+      icon="AllIcons.Actions.IntentionBulb">
+      <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
+    </action>
+  </actions>
+</idea-plugin>

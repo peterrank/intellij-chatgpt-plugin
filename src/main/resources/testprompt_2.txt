@@ -1,0 +1,214 @@
+            Write unit test cases for a class.
+            The class is as follows:
+
+package com.solvares;
+
+import java.io.InputStream;
+import java.util.Locale;
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVRecord;
+
+import java.io.FileReader;
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Properties;
+import java.util.Random;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+public class RouteComparison {
+
+  private static final String CSV_FILE_PATH = "src/main/resources/coordinates.csv";
+  private static final String PROPERTIES_FILE_PATH = "properties/application.properties";
+
+  private static String hereApiKey;
+  private static String googleApiKey;
+
+  public static void main(String[] args) throws IOException, InterruptedException {
+    // Load API keys from properties file
+    loadApiKeys();
+
+    // Load coordinates from CSV file
+    List<Coordinate> coordinates = loadCoordinatesFromCsv(CSV_FILE_PATH);
+
+    // Randomly select 20 pairs of coordinates
+    Random random = new Random(1);
+    List<Coordinate> selectedCoordinates = new ArrayList<>();
+    for (int i = 0; i < 20; i++) {
+      selectedCoordinates.add(coordinates.get(random.nextInt(coordinates.size())));
+    }
+
+    // Compare routes
+    double totalDistanceDifference = 0;
+    double totalDurationDifference = 0;
+    for (Coordinate from : selectedCoordinates) {
+      Coordinate to = coordinates.get(random.nextInt(coordinates.size()));
+
+      RouteData hereDistance = getHereRouteDistanceAndDuration(from, to);
+      RouteData googleDistance = getGoogleRouteDistanceAndDuration(from, to);
+      double distanceDifference = Math.abs(hereDistance.getDistance() - googleDistance.getDistance());
+      double durationDifference = Math.abs(hereDistance.getDuration() - googleDistance.getDuration());
+
+      double distanceDeviation = distanceDifference / hereDistance.getDistance() * 100;
+      double durationDeviation = durationDifference / hereDistance.getDuration() * 100;
+
+
+
+      System.out.printf(Locale.US,"%s; %s; %.2f; %.2f; %.2f, %.2f, %.2f, %.2f, %.2f, %.2f\n",
+          from.getAddress(), to.getAddress(), hereDistance.getDistance(), googleDistance.getDistance(), distanceDifference, distanceDeviation, hereDistance.getDuration(), googleDistance.getDuration(), durationDifference, durationDeviation);
+
+      totalDistanceDifference += distanceDifference;
+      totalDurationDifference += durationDifference;
+    }
+
+    // Calculate average difference
+    double averageDifference = totalDistanceDifference / selectedCoordinates.size();
+    System.out.printf(Locale.US, "Average distancedifference between HERE and Google distances: %.2f meters\n", averageDifference);
+
+    double averageDurationDifference = totalDurationDifference / selectedCoordinates.size();
+    System.out.printf(Locale.US, "Average durationdifference between HERE and Google distances: %.2f minutes\n", averageDurationDifference/60);
+  }
+
+  private static void loadApiKeys() throws IOException {
+    Properties properties = new Properties();
+
+    // Lade die properties Datei als Resource
+    try (InputStream input = RouteComparison.class.getClassLoader()
+        .getResourceAsStream(PROPERTIES_FILE_PATH)) {
+
+      if (input == null) {
+        throw new IOException("Unable to find properties/application.properties");
+      }
+
+      // Lade die properties aus dem Stream
+      properties.load(input);
+
+      // Lese die API-Keys aus der properties Datei
+      hereApiKey = properties.getProperty("here.api.key");
+      googleApiKey = properties.getProperty("google.api.key");
+    }
+  }
+
+
+  private static List<Coordinate> loadCoordinatesFromCsv(String csvFilePath) throws IOException {
+    List<Coordinate> coordinates = new ArrayList<>();
+
+    // Lese die CSV-Datei ohne Header
+    FileReader fileReader = new FileReader(csvFilePath);
+
+    // Verwende CSVFormat.DEFAULT ohne explizite Header-Definition
+    Iterable<CSVRecord> records = CSVFormat.DEFAULT.withDelimiter(';').parse(fileReader);
+
+    // Verarbeite jede Zeile in der CSV-Datei
+    for (CSVRecord record : records) {
+      // Erwarte, dass jede Zeile in der folgenden Reihenfolge ist: Längengrad; Breitengrad; Adresse
+      double longitude = Double.parseDouble(record.get(0)); // Längengrad
+      double latitude = Double.parseDouble(record.get(1));  // Breitengrad
+      String address = record.get(2);                       // Adresse
+
+      // Füge die Koordinate der Liste hinzu
+      coordinates.add(new Coordinate(longitude, latitude, address));
+    }
+
+    return coordinates;
+  }
+
+  private static RouteData getHereRouteDistanceAndDuration(Coordinate from, Coordinate to) throws IOException, InterruptedException {
+    String url = String.format(Locale.US, "https://router.hereapi.com/v8/routes?apikey=%s&transportMode=car&routingMode=fast&departureTime=any&origin=%f,%f&destination=%f,%f&return=summary",
+        hereApiKey, from.getLatitude(), from.getLongitude(), to.getLatitude(), to.getLongitude());
+
+    HttpRequest request = HttpRequest.newBuilder().uri(URI.create(url)).build();
+    HttpClient client = HttpClient.newHttpClient();
+    HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+    // Parse the response to extract the distance (meters)
+    return parseHereDistanceAndDuration(response.body());
+  }
+
+  private static RouteData getGoogleRouteDistanceAndDuration(Coordinate from, Coordinate to) throws IOException, InterruptedException {
+    String url = String.format(Locale.US,"https://maps.googleapis.com/maps/api/directions/json?origin=%f,%f&destination=%f,%f&key=%s",
+        from.getLatitude(), from.getLongitude(), to.getLatitude(), to.getLongitude(), googleApiKey);
+
+    HttpRequest request = HttpRequest.newBuilder().uri(URI.create(url)).build();
+    HttpClient client = HttpClient.newHttpClient();
+    HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+    // Parse the response to extract the distance (meters)
+    return parseGoogleDistanceAndDuration(response.body());
+  }
+
+  private static RouteData parseHereDistanceAndDuration(String responseBody) {
+    ObjectMapper mapper = new ObjectMapper();
+    try {
+      // Parse the JSON response
+      JsonNode root = mapper.readTree(responseBody);
+
+      // Extrahiere die Distanz (in Metern) und die Dauer (in Sekunden)
+      double distance = root.at("/routes/0/sections/0/summary/length").asDouble();  // Distanz in Metern
+      double duration = root.at("/routes/0/sections/0/summary/duration").asDouble(); // Dauer in Sekunden
+
+      return new RouteData(distance, duration);
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+
+    // Rückgabe einer Standard-RouteData mit 0 Werten im Fehlerfall
+    return new RouteData(0, 0);
+  }
+
+
+  private static RouteData parseGoogleDistanceAndDuration(String responseBody) {
+    ObjectMapper mapper = new ObjectMapper();
+    try {
+      // Parse the JSON response
+      JsonNode root = mapper.readTree(responseBody);
+
+      // Extrahiere die Distanz (in Metern) und die Dauer (in Sekunden)
+      double distance = root.at("/routes/0/legs/0/distance/value").asDouble(); // Distanz in Metern
+      double duration = root.at("/routes/0/legs/0/duration/value").asDouble(); // Dauer in Sekunden
+
+      return new RouteData(distance, duration);
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+
+    // Rückgabe einer Standard-RouteData mit 0 Werten im Fehlerfall
+    return new RouteData(0, 0);
+  }
+
+
+  static class Coordinate {
+    private double longitude;
+    private double latitude;
+    private String address;
+
+    public Coordinate(double longitude, double latitude, String address) {
+      this.longitude = longitude;
+      this.latitude = latitude;
+      this.address = address;
+    }
+
+    public double getLongitude() {
+      return longitude;
+    }
+
+    public double getLatitude() {
+      return latitude;
+    }
+
+    public String getAddress() {
+      return address;
+    }
+  }
+}
+
+            The test class should be named TestRouteComparison and should be located in the package com.solvares.
+            Use JUnit 5 and Mockito for mocking dependencies.
+            Cover edge cases, typical usage, and null values.
+            Note that the implementation may be flawed, so prioritize the class description in the comments for guidance.
+            Respond exclusively with the code of the complete code of test class.
