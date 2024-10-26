@@ -9,6 +9,7 @@ import kotlinx.coroutines.withContext
 import java.awt.*
 import javax.swing.*
 import de.softmanufaktur.chatgpt.ChatGPTClient
+import de.softmanufaktur.chatgpt.VerticalFlowLayout
 
 @Service
 class ChatGptPanel : JPanel() {
@@ -47,7 +48,7 @@ class ChatGptPanel : JPanel() {
     }
 
     private fun setupLayout() {
-        chatDisplayPanel.layout = BoxLayout(chatDisplayPanel, BoxLayout.Y_AXIS)
+        chatDisplayPanel.layout = VerticalFlowLayout()
         val chatHistoryScrollPane = JBScrollPane(chatDisplayPanel)
 
         val promptPanel = JPanel().apply {
@@ -96,12 +97,19 @@ class ChatGptPanel : JPanel() {
                 alignmentPanel.add(bubble, BorderLayout.EAST)
             }
 
-
             chatDisplayPanel.add(Box.createVerticalStrut(10))
             chatDisplayPanel.add(alignmentPanel)
         }
+
         chatDisplayPanel.revalidate()
         chatDisplayPanel.repaint()
+
+        // Scroll to bottom
+        SwingUtilities.invokeLater {
+            val scrollPane: JBScrollPane = chatDisplayPanel.parent.parent as JBScrollPane
+            val verticalScrollBar = scrollPane.verticalScrollBar
+            verticalScrollBar.value = verticalScrollBar.maximum
+        }
     }
 
     private fun sendPrompt() {
@@ -111,6 +119,7 @@ class ChatGptPanel : JPanel() {
             updateChatDisplayPanel()
 
             statusBar.text = "Anfrage mit Modell $selectedModel. Bitte warten..."
+            promptField.text = ""
             println("Modell: $selectedModel")
             CoroutineScope(Dispatchers.Main).launch {
                 val client = ChatGPTClient(selectedModel)
@@ -119,7 +128,7 @@ class ChatGptPanel : JPanel() {
                 }
                 conversationHistory.add(mapOf("role" to "assistant", "content" to response))
                 updateChatDisplayPanel()
-                promptField.text = ""
+
                 statusBar.text = ""
             }
         }
