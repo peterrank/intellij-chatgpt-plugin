@@ -15,7 +15,8 @@ Start 'runIde' with gradle.
 Select a Java class in the newly appearing IDEA window in the project tree and select the context menu “create unittests”.
 
 ### Chat
-Drag'n'Drop of Textfiles from the projecttree or from an external Filemanager are possible.
+Drag'n'Drop of Textfiles (one or multiple) from the projecttree or from an external Filemanager are possible.
+Also the filename will appear in the prompt.
 
 ## Settings
 
