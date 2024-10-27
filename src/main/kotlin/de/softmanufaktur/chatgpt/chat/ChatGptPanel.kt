@@ -10,6 +10,8 @@ import java.awt.*
 import javax.swing.*
 import de.softmanufaktur.chatgpt.ChatGPTClient
 import de.softmanufaktur.chatgpt.VerticalFlowLayout
+import java.awt.event.ComponentAdapter
+import java.awt.event.ComponentEvent
 
 @Service
 class ChatGptPanel : JPanel() {
@@ -45,6 +47,17 @@ class ChatGptPanel : JPanel() {
         clearButton.addActionListener { clearConversationHistory() }
 
         promptField.lineWrap = true
+
+        addComponentListener(object : ComponentAdapter() {
+            override fun componentResized(e: ComponentEvent?) {
+                super.componentResized(e)
+                onSizeChanged()  // Definieren Sie eine Funktion für spezialisierte Reaktionen
+            }
+        })
+    }
+
+    private fun onSizeChanged() {
+        updateChatDisplayPanel()
     }
 
     private fun setupLayout() {

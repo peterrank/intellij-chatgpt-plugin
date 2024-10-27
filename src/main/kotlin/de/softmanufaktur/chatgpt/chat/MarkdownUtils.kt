@@ -13,20 +13,33 @@ private val renderer: HtmlRenderer = HtmlRenderer.builder().build()
 fun convertMarkdownToHtml(text: String): String {
     val document = parser.parse(text)
     val htmlString = renderer.render(document)
-    val modifiedHtmlString = wrapCodeTagsWithDiv(htmlString)
+    val modifiedHtmlString = wrapPreCodeTagsWithDiv(htmlString)
     return modifiedHtmlString
 }
 
-fun wrapCodeTagsWithDiv(html: String): String {
-    val codeRegex = Regex("<code>(.*?)</code>", RegexOption.DOT_MATCHES_ALL)
-    return codeRegex.replace(html) { matchResult ->
-        val codeContent = matchResult.groups[1]?.value ?: ""
+fun wrapPreCodeTagsWithDiv(html: String): String {
+    // Regex to match <pre> tag followed by <code> tag with optional attributes
+    val preCodeRegex = Regex("<pre>\\s*\\n*<code(\\s[^>]*)?>(.*?)</code>\\s*</pre>", RegexOption.DOT_MATCHES_ALL)
+    return preCodeRegex.replace(html) { matchResult ->
+        val codeAttributes = matchResult.groups[1]?.value ?: ""
+        val codeContent = matchResult.groups[2]?.value ?: ""
         val codeId = storeCodeSnippet(codeContent)
+        var language = "";
+        if(codeAttributes!=null) {
+            language = codeAttributes.replace("class=\"language-", "").replace("\"", "")
+        }
+
         """
-        <div>
-            <code>${codeContent}</code>
-            <button type='button' onclick='window.location.href="java://copy/${codeId}"'>Kopieren</button>
-        </div>
+            <div>
+                 <div class="copylinkLine">
+                     <span class="copylinkWrapper">
+                        <a class="copylink" href="java://copy/${codeId}">$language kopieren</a>
+                    </div>
+                <div>
+                <pre >
+                    <code>$codeContent</code>                    
+                </pre>
+            <div>
         """
     }
 }
