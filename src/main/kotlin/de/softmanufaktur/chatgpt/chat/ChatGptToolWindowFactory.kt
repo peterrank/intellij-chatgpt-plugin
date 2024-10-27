@@ -11,6 +11,7 @@ class ChatGptToolWindowFactory : ToolWindowFactory, DumbAware {
 
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
         val chatGptPanel = project.service<ChatGptPanel>()
+        chatGptPanel.project = project
         val contentFactory = ContentFactory.getInstance()
         val content = contentFactory.createContent(chatGptPanel, "", false)
         toolWindow.contentManager.addContent(content)
