@@ -1,3 +1,4 @@
+// FILE: ChatGptPanel.kt
 package de.softmanufaktur.chatgpt.chat
 
 import com.google.gson.GsonBuilder
@@ -9,14 +10,12 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.ui.components.JBScrollPane
 import de.softmanufaktur.chatgpt.ChatGPTClient
-import de.softmanufaktur.chatgpt.VerticalFlowLayout
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.awt.BorderLayout
 import java.awt.Component
-import java.awt.FlowLayout
 import java.awt.datatransfer.DataFlavor
 import java.awt.dnd.DnDConstants
 import java.awt.dnd.DropTarget
@@ -37,47 +36,34 @@ import javax.swing.*
 class ChatGptPanel : JPanel() {
     lateinit var project: Project
     private val conversationHistory: MutableList<Map<String, String>> = mutableListOf()
-    private val chatDisplayPanel = JPanel()
-    private val promptField: JTextArea = JTextArea()
-    private val sendButton: JButton = JButton("Senden")
-    private val clearButton: JButton = JButton("neuer Chat")
-    private val statusBar: JLabel = JLabel("")
+    private val chatLayout = ChatGptPanelLayout()
+    private val modelSelector = ModelSelector(chatLayout.statusBar)
 
-    private lateinit var splitPane: JSplitPane
-
-    private var selectedModel: String = "gpt-4o"
+    private val chatDisplayPanel get() = chatLayout.chatDisplayPanel
+    private val promptField get() = chatLayout.promptField
 
     init {
         layout = BorderLayout()
-        promptField.initFileDropHandler()
-
-        // Load selected model
-        selectedModel = loadSelectedModel()
 
         // Create menu bar with model selector
-        val modelSelector = createModelSelector()
-        val menuBar = JMenuBar()
-        menuBar.add(JLabel("Modell: ") as Component)
-        menuBar.add(modelSelector as Component)
-
-        // Add "Save Chat" menu item
-        val saveChatMenuItem = JMenuItem("Chat speichern")
-        saveChatMenuItem.addActionListener { e -> saveChatToFile() }
-        menuBar.add(saveChatMenuItem)
-
+        val modelComboBox = modelSelector.createModelSelector()
+        val menuBar = JMenuBar().apply {
+            add(JLabel("Modell: ") as Component)
+            add(modelComboBox as Component)
+            add(JMenuItem("Chat speichern").apply {
+                addActionListener { e -> saveChatToFile() }
+            })
+        }
         add(menuBar, BorderLayout.NORTH)
+        add(chatLayout.setupLayout(), BorderLayout.CENTER)
 
-        setupLayout()
-
-        sendButton.addActionListener { sendPrompt() }
-        clearButton.addActionListener { clearConversationHistory() }
-
-        promptField.lineWrap = true
+        chatLayout.sendButton.addActionListener { sendPrompt() }
+        chatLayout.clearButton.addActionListener { clearConversationHistory() }
 
         addComponentListener(object : ComponentAdapter() {
             override fun componentResized(e: ComponentEvent?) {
                 super.componentResized(e)
-                onSizeChanged()
+                updateChatDisplayPanel()
             }
         })
 
@@ -94,7 +80,7 @@ class ChatGptPanel : JPanel() {
                     for (file in files) {
                         if (file.extension == "json") { // Check if the file is a JSON file
                             loadMessagesFromFile(file)
-                            statusBar.text = "Chat aus Datei \"${file.name}\" geladen."
+                            chatLayout.statusBar.text = "Chat aus Datei \"${file.name}\" geladen."
                         }
                     }
                 }
@@ -102,44 +88,6 @@ class ChatGptPanel : JPanel() {
                 event.dropComplete(true)
             }
         })
-    }
-
-    private fun onSizeChanged() {
-        updateChatDisplayPanel()
-    }
-
-    private fun setupLayout() {
-        chatDisplayPanel.layout = VerticalFlowLayout()
-        val chatHistoryScrollPane = JBScrollPane(chatDisplayPanel)
-
-        val promptPanel = JPanel().apply {
-            layout = BorderLayout(10, 10)
-            add(statusBar, BorderLayout.NORTH)
-            add(JScrollPane(promptField), BorderLayout.CENTER)
-        }
-
-        splitPane = JSplitPane(JSplitPane.VERTICAL_SPLIT, chatHistoryScrollPane, promptPanel)
-        splitPane.resizeWeight = 0.7
-        splitPane.border = BorderFactory.createEmptyBorder()
-
-        val buttonPanel = JPanel(FlowLayout(FlowLayout.RIGHT)).apply {
-            add(clearButton)
-            add(sendButton)
-        }
-
-        add(splitPane, BorderLayout.CENTER)
-        add(buttonPanel, BorderLayout.SOUTH)
-    }
-
-    private fun createModelSelector(): JComboBox<String> {
-        val modelSelector = JComboBox(arrayOf("gpt-4o", "gpt-4", "gpt-3.5-turbo", "gpt-3"))
-        modelSelector.selectedItem = selectedModel
-        modelSelector.addActionListener {
-            selectedModel = modelSelector.selectedItem as String
-            statusBar.text = "Modell gewechselt zu: $selectedModel"
-            saveSelectedModel(selectedModel)
-        }
-        return modelSelector
     }
 
     private fun updateChatDisplayPanel() {
@@ -179,17 +127,17 @@ class ChatGptPanel : JPanel() {
             conversationHistory.add(mapOf("role" to "user", "content" to prompt))
             updateChatDisplayPanel()
 
-            statusBar.text = "Anfrage mit Modell $selectedModel. Bitte warten..."
+            chatLayout.statusBar.text = "Anfrage mit Modell ${modelSelector.selectedModel}. Bitte warten..."
             promptField.text = ""
             CoroutineScope(Dispatchers.Main).launch {
-                val client = ChatGPTClient(selectedModel)
+                val client = ChatGPTClient(modelSelector.selectedModel)
                 val response = withContext(Dispatchers.IO) {
                     client.callChatGpt(conversationHistory)
                 }
                 conversationHistory.add(mapOf("role" to "assistant", "content" to response))
                 updateChatDisplayPanel()
 
-                statusBar.text = ""
+                chatLayout.statusBar.text = ""
             }
         }
     }
@@ -228,7 +176,7 @@ class ChatGptPanel : JPanel() {
         gson.toJson(jsonMessages, fileWriter)
         fileWriter.close()
 
-        statusBar.text = "Chat gespeichert als $fileName"
+        chatLayout.statusBar.text = "Chat gespeichert als $fileName"
 
         ApplicationManager.getApplication().runWriteAction {
             VirtualFileManager.getInstance().asyncRefresh(null)
