@@ -3,11 +3,8 @@ package de.softmanufaktur.chatgpt.chat
 
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonArray
-import com.google.gson.JsonObject
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.ui.components.JBScrollPane
 import de.softmanufaktur.chatgpt.ChatGPTClient
 import kotlinx.coroutines.CoroutineScope
@@ -24,20 +21,17 @@ import java.awt.dnd.DropTargetDropEvent
 import java.awt.event.ComponentAdapter
 import java.awt.event.ComponentEvent
 import java.io.File
-import java.io.FileWriter
 import java.nio.file.Files
 import java.nio.file.Paths
-import java.text.SimpleDateFormat
-import java.util.*
 import javax.swing.*
 
 
-@Service
-class ChatGptPanel : JPanel() {
-    lateinit var project: Project
-    private val conversationHistory: MutableList<Map<String, String>> = mutableListOf()
+@Service(Service.Level.PROJECT)
+class ChatGptPanel(private val project: Project) : JPanel() {
+    private val conversationHistory = ConversationHistory()
     private val chatLayout = ChatGptPanelLayout()
     private val modelSelector = ModelSelector(chatLayout.statusBar)
+    private val saveChatHandler = SaveChatHandler(project, chatLayout)
 
     private val chatDisplayPanel get() = chatLayout.chatDisplayPanel
     private val promptField get() = chatLayout.promptField
@@ -51,7 +45,7 @@ class ChatGptPanel : JPanel() {
             add(JLabel("Modell: ") as Component)
             add(modelComboBox as Component)
             add(JMenuItem("Chat speichern").apply {
-                addActionListener { e -> saveChatToFile() }
+                addActionListener { e -> saveChatHandler.saveChatToFile(conversationHistory) }
             })
         }
         add(menuBar, BorderLayout.NORTH)
@@ -92,7 +86,7 @@ class ChatGptPanel : JPanel() {
 
     private fun updateChatDisplayPanel() {
         chatDisplayPanel.removeAll()
-        for (message in conversationHistory) {
+        for (message in conversationHistory.getAllMessages()) {
             val role = message["role"] ?: ""
             val content = message["content"] ?: ""
 
@@ -124,7 +118,7 @@ class ChatGptPanel : JPanel() {
     private fun sendPrompt() {
         val prompt = promptField.text.trim()
         if (prompt.isNotBlank()) {
-            conversationHistory.add(mapOf("role" to "user", "content" to prompt))
+            conversationHistory.addMessage("user", prompt)
             updateChatDisplayPanel()
 
             chatLayout.statusBar.text = "Anfrage mit Modell ${modelSelector.selectedModel}. Bitte warten..."
@@ -132,9 +126,9 @@ class ChatGptPanel : JPanel() {
             CoroutineScope(Dispatchers.Main).launch {
                 val client = ChatGPTClient(modelSelector.selectedModel)
                 val response = withContext(Dispatchers.IO) {
-                    client.callChatGpt(conversationHistory)
+                    client.callChatGpt(conversationHistory.getAllMessages())
                 }
-                conversationHistory.add(mapOf("role" to "assistant", "content" to response))
+                conversationHistory.addMessage("assistant", response)
                 updateChatDisplayPanel()
 
                 chatLayout.statusBar.text = ""
@@ -148,41 +142,6 @@ class ChatGptPanel : JPanel() {
         updateChatDisplayPanel()
     }
 
-    private fun saveChatToFile() {
-        val basePath = project.basePath ?: throw IllegalStateException("Project base path is not available")
-        val chatDirectory = File(basePath, "ChatGPT-Prompts")
-        if (!chatDirectory.exists()) {
-            chatDirectory.mkdirs()
-        }
-
-        val dateFormat = SimpleDateFormat("yyyyMMdd_HHmmss")
-        val date = Date()
-        val fileName = "Chat_${dateFormat.format(date)}.json"
-
-        val chatFile = File(chatDirectory, fileName)
-        val fileWriter = FileWriter(chatFile)
-
-        val jsonMessages = JsonArray()
-        conversationHistory.forEach { message ->
-            val jsonMessage = JsonObject()
-            val role = message["role"] ?: "unknown"
-            val content = message["content"] ?: ""
-            jsonMessage.addProperty("role", role)
-            jsonMessage.addProperty("content", content)
-            jsonMessages.add(jsonMessage)
-        }
-
-        val gson = GsonBuilder().setPrettyPrinting().create()
-        gson.toJson(jsonMessages, fileWriter)
-        fileWriter.close()
-
-        chatLayout.statusBar.text = "Chat gespeichert als $fileName"
-
-        ApplicationManager.getApplication().runWriteAction {
-            VirtualFileManager.getInstance().asyncRefresh(null)
-        }
-    }
-
     private fun loadMessagesFromFile(file: File) {
         val jsonString = Files.readString(Paths.get(file.toURI()))
         val jsonMessages = GsonBuilder().create().fromJson(jsonString, JsonArray::class.java)
@@ -191,7 +150,7 @@ class ChatGptPanel : JPanel() {
             val jsonMessage = jsonElement.asJsonObject
             val role = jsonMessage.get("role").asString
             val content = jsonMessage.get("content").asString
-            conversationHistory.add(mapOf("role" to role, "content" to content))
+            conversationHistory.addMessage(role, content)
         }
 
         updateChatDisplayPanel()
