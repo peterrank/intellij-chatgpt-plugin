@@ -20,7 +20,7 @@ fun copyToClipboard(text: String) {
 
 fun createMessageBubble(bubbleText: String, isUser: Boolean, maxBubbleWidth: Int): JPanel {
     val htmlBubbleText = convertMarkdownToHtml(bubbleText)
-    println("bubbleText is $htmlBubbleText");
+    //println("bubbleText is $htmlBubbleText");
     val bubblePanel = JPanel().apply {
         layout = BorderLayout()
         background = if (isUser) Color(37, 105, 51) else Color(0, 64, 128)

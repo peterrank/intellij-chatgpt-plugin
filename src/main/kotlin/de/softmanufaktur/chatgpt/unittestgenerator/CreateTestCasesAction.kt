@@ -28,8 +28,16 @@ class CreateTestCasesAction : AnAction() {
             val settings = UnitTestGeneratorSettings.instance
             val testCases = ChatGPTClient(settings.gptModel).callChatGpt(prompt)
 
+            var modifiedTestCases = testCases
+            if (modifiedTestCases.startsWith("```java\n")) {
+                modifiedTestCases = modifiedTestCases.removePrefix("```java\n")
+            }
+            if (modifiedTestCases.endsWith("```")) {
+                modifiedTestCases = modifiedTestCases.removeSuffix("```")
+            }
+
             // Testklasse in das Testverzeichnis speichern
-            FileUtils.saveTestClass(e, className, packagePath, testCases)
+            FileUtils.saveTestClass(e, className, packagePath, modifiedTestCases)
 
             // Benachrichtigung an den Nutzer
             Messages.showMessageDialog(

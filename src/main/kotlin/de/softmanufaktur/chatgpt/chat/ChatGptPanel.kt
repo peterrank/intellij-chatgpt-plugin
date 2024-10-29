@@ -123,18 +123,31 @@ class ChatGptPanel(private val project: Project) : JPanel() {
 
             chatLayout.statusBar.text = "Anfrage mit Modell ${modelSelector.selectedModel}. Bitte warten..."
             promptField.text = ""
+
+            // Start a coroutine scope on the main dispatcher
             CoroutineScope(Dispatchers.Main).launch {
                 val client = ChatGPTClient(modelSelector.selectedModel)
-                val response = withContext(Dispatchers.IO) {
-                    client.callChatGpt(conversationHistory.getAllMessages())
+                conversationHistory.addMessage("assistant", "")
+                // Switch to IO for network request
+                withContext(Dispatchers.IO) {
+                    client.callChatGpt(conversationHistory.getAllMessages(), useStreaming = true) { partialResponse ->
+                        CoroutineScope(Dispatchers.Main).launch {
+                            withContext(Dispatchers.Main) {
+                                // Update the conversation history and UI
+                                conversationHistory.addToLastMessage(partialResponse)
+                                updateChatDisplayPanel()
+                            }
+                        }
+                    }
                 }
-                conversationHistory.addMessage("assistant", response)
-                updateChatDisplayPanel()
 
+                // Reset the status bar back on the main thread
                 chatLayout.statusBar.text = ""
             }
         }
     }
+
+
 
     private fun clearConversationHistory() {
         conversationHistory.clear()
