@@ -91,7 +91,7 @@ class ChatGptPanel(private val project: Project) : JPanel() {
             val content = message["content"] ?: ""
 
             val maxBubbleWidth = chatDisplayPanel.width - 100
-            val bubble = createMessageBubble(content, role == "user", maxBubbleWidth)
+            val bubble = createMessageBubble(content, role == "user", maxBubbleWidth, project)
 
             val alignmentPanel = JPanel(BorderLayout())
             if (role == "user") {
@@ -130,7 +130,7 @@ class ChatGptPanel(private val project: Project) : JPanel() {
                 conversationHistory.addMessage("assistant", "")
                 // Switch to IO for network request
                 withContext(Dispatchers.IO) {
-                    client.callChatGpt(conversationHistory.getAllMessages(), useStreaming = true) { partialResponse ->
+                    client.callChatGptWithStreaming(conversationHistory.getAllMessages()) { partialResponse ->
                         CoroutineScope(Dispatchers.Main).launch {
                             withContext(Dispatchers.Main) {
                                 // Update the conversation history and UI

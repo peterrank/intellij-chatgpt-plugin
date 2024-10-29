@@ -24,21 +24,22 @@ fun wrapPreCodeTagsWithDiv(html: String): String {
         val codeAttributes = matchResult.groups[1]?.value ?: ""
         val codeContent = matchResult.groups[2]?.value ?: ""
         val codeId = storeCodeSnippet(codeContent)
-        var language = "";
-        if(codeAttributes!=null) {
-            language = codeAttributes.replace("class=\"language-", "").replace("\"", "")
-        }
+        val language = codeAttributes.replace("class=\"language-", "").replace("\"", "")
 
         """
             <div>
-                 <div class="copylinkLine">
-                     <span class="copylinkWrapper">
-                        <a class="copylink" href="java://copy/${codeId}">$language kopieren</a>
-                    </div>
-                <div>
                 <pre >
                     <code>$codeContent</code>                    
                 </pre>
+                <div class="copylinkLine">
+                     <span class="copylinkWrapper">
+                        <a class="copylink" href="java://copy/${codeId}">$language Code kopieren</a>
+                    </span>
+                    &nbsp;
+                    <span class="copylinkWrapper">
+                        <a class="copylink" href="java://takeover/${codeId}">$language Code übernehmen</a>
+                    </span>
+                <div>
             <div>
         """
     }

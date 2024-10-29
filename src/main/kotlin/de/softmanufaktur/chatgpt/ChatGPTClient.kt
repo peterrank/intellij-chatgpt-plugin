@@ -19,11 +19,7 @@ class ChatGPTClient(private val model: String) {
         .build()
     private val gson = Gson()
 
-    fun callChatGpt(prompt: String): String {
-        return callChatGpt(singlePromptToHistory(prompt), false) { partialResponse -> print(partialResponse) }
-    }
-
-    fun callChatGpt(conversionHistory: List<Map<String, String>>, useStreaming: Boolean, onPartialResponse: (String) -> Unit): String {
+    private fun getRequest(conversionHistory: List<Map<String, String>>, useStreaming: Boolean): Request {
         val apiKey = System.getenv("OPENAI_API_KEY")
 
         val requestBodyMap = mapOf(
@@ -40,8 +36,23 @@ class ChatGPTClient(private val model: String) {
             .post(requestBody.toRequestBody("application/json".toMediaType()))
             .build()
 
+        return request
+    }
 
-        if(useStreaming) {
+    fun callChatGpt(prompt: String): String {
+        val request = getRequest(singlePromptToHistory(prompt), false)
+        val response: Response = client.newCall(request).execute()
+        return if (response.isSuccessful) {
+            val responseBody = response.body?.string() ?: "No response from the API"
+            extractContentFromResponse(responseBody)
+        } else {
+            "Error with the API request: ${response.message}"
+        }
+    }
+
+    fun callChatGptWithStreaming(conversionHistory: List<Map<String, String>>, onPartialResponse: (String) -> Unit): String {
+        val request = getRequest(conversionHistory, true)
+
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
                     return "Error with the API request: ${response.message}"
@@ -54,22 +65,12 @@ class ChatGPTClient(private val model: String) {
                             // Process the received line (depending on your streaming response structure)
                             val partialContent = extractPartialContentFromLine(line)
                             // Call the UI update or any processing on each part
-                            print(partialContent)
                             onPartialResponse(partialContent)
                         }
                     }
                 }
             }
             return ""
-        } else {
-            val response: Response = client.newCall(request).execute()
-            return if (response.isSuccessful) {
-                val responseBody = response.body?.string() ?: "No response from the API"
-                extractContentFromResponse(responseBody)
-            } else {
-                "Error with the API request: ${response.message}"
-            }
-        }
     }
 
     fun singlePromptToHistory(prompt: String): List<Map<String, String>> {
