@@ -28,10 +28,12 @@ fun wrapPreCodeTagsWithDiv(html: String): String {
 
         """
             <div>
-                <pre >
-                    <code>$codeContent</code>                    
+                <pre>
+                    <code>
+$codeContent
+                    </code>                    
                 </pre>
-                <div class="copylinkLine">
+                <span class="copylinkLine">
                      <span class="copylinkWrapper">
                         <a class="copylink" href="java://copy/${codeId}">$language Code kopieren</a>
                     </span>
@@ -39,7 +41,7 @@ fun wrapPreCodeTagsWithDiv(html: String): String {
                     <span class="copylinkWrapper">
                         <a class="copylink" href="java://takeover/${codeId}">$language Code übernehmen</a>
                     </span>
-                <div>
+                <span>
             <div>
         """
     }

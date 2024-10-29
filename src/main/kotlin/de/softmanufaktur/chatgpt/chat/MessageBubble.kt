@@ -1,7 +1,9 @@
 package de.softmanufaktur.chatgpt.chat
 
 import com.intellij.execution.multilaunch.design.components.RoundedCornerBorder
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.util.preferredWidth
 import org.apache.commons.text.StringEscapeUtils
@@ -34,7 +36,7 @@ fun takeoverToCode(text: String, project: Project) {
 
     // Schritt 3: Verzeichnisstruktur aus dem Paketnamen aufbauen
     val baseDirectory = project.basePath
-    val projectStructurePath = "src/main/kotlin/"  // Basisverzeichnis des Projekts
+    val projectStructurePath = "src/main/java/"  // Basisverzeichnis des Projekts
     val packagePath = packageName.replace(".", "/")  // Paket in Pfad umwandeln
     val targetDirectory = File(baseDirectory, projectStructurePath + packagePath)
 
@@ -48,6 +50,10 @@ fun takeoverToCode(text: String, project: Project) {
     outputFile.writeText(unescapedText)
 
     println("Datei gespeichert unter: ${outputFile.absolutePath}")
+
+    ApplicationManager.getApplication().runWriteAction {
+        VirtualFileManager.getInstance().asyncRefresh(null)
+    }
 }
 
 fun createMessageBubble(bubbleText: String, isUser: Boolean, maxBubbleWidth: Int, project: Project): JPanel {
@@ -70,7 +76,7 @@ fun createMessageBubble(bubbleText: String, isUser: Boolean, maxBubbleWidth: Int
                 addRule("pre { background-color: white; color: black; border: 1px solid white; padding: 10px; margin: 10px; }")
                 addRule("code { background-color: white; color: black; border: 1px solid white; margin: 10px; padding: 5px; overflow-x: auto; white-space: pre; width: 100%}")
                 addRule("h3 { font-size: 1.5em; }")
-                addRule(".copylinkLine {text-align: center;}")
+
                 addRule(".copylinkWrapper {background-color: white; padding: 5px; margin: 10px; border: 1px solid red;}")
                 addRule(".copylink { text-decoration: underline; color: blue;}")
             }
